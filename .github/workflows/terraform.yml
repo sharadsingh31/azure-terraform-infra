@@ -1,0 +1,93 @@
+name: "Azure Infrastructure provisioning via Terraform"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform (plan or apply)"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+
+permissions:
+  id-token: write # Required for Azure OIDC login
+  contents: read
+
+env:
+  # Credentials for Azure provider authentication
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }} # Leave empty if using OIDC
+
+  # Remote backend configuration details
+  BACKEND_RESOURCE_GROUP: ${{ vars.BACKEND_RESOURCE_GROUP }}
+  BACKEND_STORAGE_ACCOUNT: ${{ vars.BACKEND_STORAGE_ACCOUNT }}
+  BACKEND_CONTAINER: ${{ vars.BACKEND_CONTAINER }}
+  BACKEND_KEY: "terraform.tfstate"
+
+jobs:
+  terraform:
+    name: "Terraform Plan & Apply"
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      # Optional: Azure login step if using OIDC (uncomment if using OIDC instead of client secret)
+      # - name: Azure Login (OIDC)
+      #   if: env.ARM_CLIENT_SECRET == ''
+      #   uses: azure/login@v2
+      #   with:
+      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ env.BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ env.BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ env.BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ env.BACKEND_KEY }}"
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+        run: terraform plan -no-color -input=false
+
+      # Generates plan and saves it for sequential apply step
+      - name: Terraform Plan for Apply
+        id: plan_for_apply
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'))
+        run: terraform plan -out=tfplan -input=false
+
+      - name: Terraform Apply
+        id: apply
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply'))
+        run: terraform apply -input=false tfplan
