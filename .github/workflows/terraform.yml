@@ -72,7 +72,7 @@ jobs:
             -backend-config="storage_account_name=${{ env.BACKEND_STORAGE_ACCOUNT }}" \
             -backend-config="container_name=${{ env.BACKEND_CONTAINER }}" \
             -backend-config="key=${{ env.BACKEND_KEY }}"
-          working-directory: root
+        working-directory: root
 
       - name: Terraform Validate
         id: validate
