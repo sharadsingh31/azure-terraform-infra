@@ -30,7 +30,7 @@ kubernetes_clusters = {
     node_count             = 2
     vm_size                = "Standard_D2s_v3"
     os_disk_size_gb        = 30
-    acr_key                = "acrdevopsdemotoday01" # Must match the key in container_registries
+    acr_key                = "acrdevopssh" # Must match the key in container_registries
     tags = {
       Environment = "Development"
     }

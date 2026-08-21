@@ -1,6 +1,6 @@
 # Create Resource Groups
 module "resource_group" {
-  source   = "./modules/resource_group"
+  source   = "../modules/resource_group"
   for_each = var.resource_groups
 
   resource_group_name = each.key
@@ -10,7 +10,7 @@ module "resource_group" {
 
 # Create Container Registries
 module "acr" {
-  source   = "./modules/acr"
+  source   = "../modules/acr"
   for_each = var.container_registries
 
   registry_name       = each.key
@@ -25,7 +25,7 @@ module "acr" {
 
 # Create Azure Kubernetes Service clusters
 module "aks" {
-  source   = "./modules/aks"
+  source   = "../modules/aks"
   for_each = var.kubernetes_clusters
 
   cluster_name           = each.key
