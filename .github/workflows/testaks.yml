@@ -1,0 +1,76 @@
+name: "Terraform Azure Infrastructure"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Choose Terraform action"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  # Azure authentication - GitHub OIDC
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+  # Terraform backend
+  BACKEND_RESOURCE_GROUP: ${{ vars.BACKEND_RESOURCE_GROUP }}
+  BACKEND_STORAGE_ACCOUNT: ${{ vars.BACKEND_STORAGE_ACCOUNT }}
+  BACKEND_CONTAINER: ${{ vars.BACKEND_CONTAINER }}
+  BACKEND_KEY: terraform.tfstate
+
+jobs:
+  terraform:
+    name: "Terraform ${{ inputs.action }}"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+        working-directory: root
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${BACKEND_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${BACKEND_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=${BACKEND_CONTAINER}" \
+            -backend-config="key=${BACKEND_KEY}"
+        working-directory: root
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: root
+
+      - name: Terraform Plan
+        if: inputs.action == 'plan'
+        run: terraform plan -input=false
+        working-directory: root
+
+      - name: Terraform Plan
+        if: inputs.action == 'apply'
+        run: terraform plan -out=tfplan -input=false
+        working-directory: root
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -input=false tfplan
+        working-directory: root
