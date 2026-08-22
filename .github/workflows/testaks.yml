@@ -13,11 +13,11 @@ on:
           - apply
 
 permissions:
-  id-token: write
   contents: read
 
 env:
-  # Azure authentication - GitHub OIDC
+  # Azure Service Principal authentication
+  ARM_USE_CLI: false
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
   ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
@@ -65,7 +65,7 @@ jobs:
         run: terraform plan -input=false
         working-directory: root
 
-      - name: Terraform Plan
+      - name: Terraform Plan for Apply
         if: inputs.action == 'apply'
         run: terraform plan -out=tfplan -input=false
         working-directory: root
